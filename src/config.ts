@@ -2,7 +2,7 @@ import { z } from "zod";
 
 const configSchema = z.object({
   ollamaBaseUrl: z.string().url().default("http://127.0.0.1:11434"),
-  ollamaModel: z.string().min(1).default("llama3.2"),
+  ollamaModel: z.string().min(1).default("qwen3.5:9b"),
   whisperModel: z.enum(["tiny", "base", "small", "medium", "large"]).default("base"),
   maxParallelClips: z.coerce.number().int().min(1).max(10).default(3),
   silenceThresholdDb: z.coerce.number().default(-35),

@@ -16,11 +16,11 @@ bun install
 
 # Start Ollama locally (example)
 ollama serve
-ollama pull llama3.2
+ollama pull qwen3.5:9b
 
 # Set environment variables (optional)
 export OLLAMA_BASE_URL="http://127.0.0.1:11434"
-export OLLAMA_MODEL="llama3.2"
+export OLLAMA_MODEL="qwen3.5:9b"
 ```
 
 ## Usage
@@ -49,7 +49,7 @@ Environment variables (all optional with defaults):
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `OLLAMA_BASE_URL` | `http://127.0.0.1:11434` | Local Ollama API base URL |
-| `OLLAMA_MODEL` | `llama3.2` | Ollama model used for clip selection |
+| `OLLAMA_MODEL` | `qwen3.5:9b` | Ollama model used for clip selection |
 | `WHISPER_MODEL` | `base` | Whisper model size (tiny\|base\|small\|medium\|large) |
 | `MAX_PARALLEL_CLIPS` | `3` | Max parallel clip processing (1-10) |
 | `SILENCE_THRESHOLD_DB` | `-35` | Silence detection threshold |

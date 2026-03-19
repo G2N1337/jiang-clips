@@ -77,7 +77,7 @@ describe("VideoProcessor", () => {
     const vp = new VideoProcessor();
     const config = {
       ollamaBaseUrl: "http://127.0.0.1:11434",
-      ollamaModel: "llama3.2",
+      ollamaModel: "qwen3.5:9b",
       whisperModel: "base" as const,
       maxParallelClips: 3,
       silenceThresholdDb: -30,
@@ -112,7 +112,7 @@ describe("VideoProcessor", () => {
     const vp = new VideoProcessor();
     const config = {
       ollamaBaseUrl: "http://127.0.0.1:11434",
-      ollamaModel: "llama3.2",
+      ollamaModel: "qwen3.5:9b",
       whisperModel: "base" as const,
       maxParallelClips: 3,
       silenceThresholdDb: -35,

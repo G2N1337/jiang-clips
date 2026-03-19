@@ -5,7 +5,7 @@ import type { Transcript, VideoMetadata } from "../../src/pipeline/types";
 
 const config: Config = {
   ollamaBaseUrl: "http://127.0.0.1:11434",
-  ollamaModel: "llama3.2",
+  ollamaModel: "qwen3.5:9b",
   whisperModel: "base",
   maxParallelClips: 3,
   silenceThresholdDb: -35,

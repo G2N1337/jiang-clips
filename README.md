@@ -6,7 +6,7 @@ Automated short-form clip extraction pipeline for YouTube videos using AI.
 
 - **Runtime**: Bun
 - **FFmpeg**: Required for video processing
-- **Google Gemini API Key**: Required for AI content generation
+- **Ollama**: Required locally for AI clip selection
 
 ## Setup
 
@@ -14,8 +14,13 @@ Automated short-form clip extraction pipeline for YouTube videos using AI.
 # Install dependencies
 bun install
 
-# Set environment variables
-export GEMINI_API_KEY="your-api-key"
+# Start Ollama locally (example)
+ollama serve
+ollama pull llama3.2
+
+# Set environment variables (optional)
+export OLLAMA_BASE_URL="http://127.0.0.1:11434"
+export OLLAMA_MODEL="llama3.2"
 ```
 
 ## Usage
@@ -43,7 +48,8 @@ Environment variables (all optional with defaults):
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `GEMINI_API_KEY` | (required) | Google Gemini API key |
+| `OLLAMA_BASE_URL` | `http://127.0.0.1:11434` | Local Ollama API base URL |
+| `OLLAMA_MODEL` | `llama3.2` | Ollama model used for clip selection |
 | `WHISPER_MODEL` | `base` | Whisper model size (tiny\|base\|small\|medium\|large) |
 | `MAX_PARALLEL_CLIPS` | `3` | Max parallel clip processing (1-10) |
 | `SILENCE_THRESHOLD_DB` | `-35` | Silence detection threshold |

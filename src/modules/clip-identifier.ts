@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { z } from "zod";
 import { createLogger } from "../utils/logger";
 import type { Config } from "../config";
 import type { Transcript, VideoMetadata, ClipCandidate } from "../pipeline/types";
@@ -6,40 +6,63 @@ import type { Transcript, VideoMetadata, ClipCandidate } from "../pipeline/types
 const log = createLogger("clip-identifier");
 
 const CLIP_SCHEMA = {
-  type: "object" as const,
+  type: "object",
   properties: {
     clips: {
-      type: "array" as const,
+      type: "array",
       items: {
-        type: "object" as const,
+        type: "object",
         properties: {
-          title: { type: "string" as const },
-          hookLine: { type: "string" as const },
-          startTime: { type: "number" as const },
-          endTime: { type: "number" as const },
-          reasoning: { type: "string" as const },
-          viralScore: { type: "number" as const },
-          tags: { type: "array" as const, items: { type: "string" as const } },
+          title: { type: "string" },
+          hookLine: { type: "string" },
+          startTime: { type: "number" },
+          endTime: { type: "number" },
+          reasoning: { type: "string" },
+          viralScore: { type: "number" },
+          tags: { type: "array", items: { type: "string" } },
         },
         required: ["title", "hookLine", "startTime", "endTime", "reasoning", "viralScore", "tags"],
       },
     },
   },
   required: ["clips"],
-};
+} as const;
+
+const clipResponseSchema = z.object({
+  clips: z.array(
+    z.object({
+      title: z.string(),
+      hookLine: z.string(),
+      startTime: z.number(),
+      endTime: z.number(),
+      reasoning: z.string(),
+      viralScore: z.number(),
+      tags: z.array(z.string()),
+    }),
+  ),
+});
+
+interface OllamaGenerateResponse {
+  response?: string;
+  error?: string;
+}
 
 export class ClipIdentifier {
-  private ai: GoogleGenAI;
+  private ollamaBaseUrl: string;
+  private ollamaModel: string;
 
   constructor(config: Config) {
-    this.ai = new GoogleGenAI({ apiKey: config.geminiApiKey });
+    this.ollamaBaseUrl = config.ollamaBaseUrl.replace(/\/$/, "");
+    this.ollamaModel = config.ollamaModel;
   }
 
   async identify(transcript: Transcript, metadata: VideoMetadata): Promise<ClipCandidate[]> {
-    log.info(`Analyzing transcript for clip-worthy segments...`);
+    log.info(`Analyzing transcript for clip-worthy segments with Ollama (${this.ollamaModel})...`);
 
     const formattedTranscript = transcript.segments
-      .map((s) => `[${s.start.toFixed(1)}s - ${s.end.toFixed(1)}s] ${s.text}`)
+      .map(
+        (segment) => `[${segment.start.toFixed(1)}s - ${segment.end.toFixed(1)}s] ${segment.text}`,
+      )
       .join("\n");
 
     const prompt = `You are a viral content strategist specializing in history/education TikTok and YouTube Shorts.
@@ -63,68 +86,94 @@ Each clip MUST:
 IMPORTANT: The timestamps in the transcript are in SECONDS (e.g., 533.0s means 533 seconds into the video).
 Return startTime and endTime as numbers in SECONDS (not minutes:seconds). For example, if a clip starts at 8 minutes 53 seconds, return startTime: 533.
 
+Return ONLY valid JSON matching this schema. Do not include markdown fences or commentary.
+
 TRANSCRIPT:
 ${formattedTranscript}
 
 Return clips sorted by viralScore (highest first). Aim for 5-15 clips depending on video length.`;
 
-    const response = await this.ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: CLIP_SCHEMA,
+    const response = await fetch(`${this.ollamaBaseUrl}/api/generate`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
       },
+      body: JSON.stringify({
+        model: this.ollamaModel,
+        prompt,
+        stream: false,
+        format: CLIP_SCHEMA,
+        options: {
+          temperature: 0.2,
+        },
+      }),
     });
 
-    const text = response.text ?? "";
-    const parsed = JSON.parse(text) as {
-      clips: Array<{
-        title: string;
-        hookLine: string;
-        startTime: number;
-        endTime: number;
-        reasoning: string;
-        viralScore: number;
-        tags: string[];
-      }>;
-    };
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`Ollama request failed (${response.status} ${response.statusText}): ${body}`);
+    }
+
+    const payload = (await response.json()) as OllamaGenerateResponse;
+    if (payload.error) {
+      throw new Error(`Ollama returned an error: ${payload.error}`);
+    }
+
+    const text = payload.response?.trim() ?? "";
+    if (!text) {
+      throw new Error("Ollama returned an empty response while identifying clips");
+    }
+
+    const parsed = clipResponseSchema.parse(JSON.parse(this.extractJson(text)));
 
     log.info(
-      `Gemini returned ${parsed.clips.length} raw clips (video duration: ${metadata.duration}s)`,
+      `Ollama returned ${parsed.clips.length} raw clips (video duration: ${metadata.duration}s)`,
     );
-    for (const c of parsed.clips) {
-      const dur = c.endTime - c.startTime;
+    for (const clip of parsed.clips) {
+      const duration = clip.endTime - clip.startTime;
       log.debug(
-        `  "${c.title}" ${c.startTime}s-${c.endTime}s (${dur.toFixed(0)}s) score=${c.viralScore}`,
+        `  "${clip.title}" ${clip.startTime}s-${clip.endTime}s (${duration.toFixed(0)}s) score=${clip.viralScore}`,
       );
     }
 
     const candidates: ClipCandidate[] = parsed.clips
-      .filter((c) => {
-        const duration = c.endTime - c.startTime;
-        if (duration < 15 || duration > 120 || c.startTime < 0 || c.endTime > metadata.duration) {
+      .filter((clip) => {
+        const duration = clip.endTime - clip.startTime;
+        if (
+          duration < 15 ||
+          duration > 120 ||
+          clip.startTime < 0 ||
+          clip.endTime > metadata.duration
+        ) {
           log.debug(
-            `  Filtered out: "${c.title}" (dur=${duration.toFixed(0)}s, end=${c.endTime}, max=${metadata.duration})`,
+            `  Filtered out: "${clip.title}" (dur=${duration.toFixed(0)}s, end=${clip.endTime}, max=${metadata.duration})`,
           );
           return false;
         }
         return true;
       })
-      .map((c) => ({
+      .map((clip) => ({
         id: crypto.randomUUID(),
-        title: c.title,
-        hookLine: c.hookLine,
-        startTime: c.startTime,
-        endTime: c.endTime,
-        duration: c.endTime - c.startTime,
-        reasoning: c.reasoning,
-        viralScore: c.viralScore,
-        tags: c.tags,
+        title: clip.title,
+        hookLine: clip.hookLine,
+        startTime: clip.startTime,
+        endTime: clip.endTime,
+        duration: clip.endTime - clip.startTime,
+        reasoning: clip.reasoning,
+        viralScore: clip.viralScore,
+        tags: clip.tags,
       }))
       .sort((a, b) => b.viralScore - a.viralScore);
 
     log.info(`Identified ${candidates.length} clip candidates`);
     return candidates;
+  }
+
+  private extractJson(responseText: string): string {
+    const fencedMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (fencedMatch?.[1]) {
+      return fencedMatch[1].trim();
+    }
+    return responseText;
   }
 }

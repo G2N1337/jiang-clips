@@ -1,7 +1,8 @@
 import { z } from "zod";
 
 const configSchema = z.object({
-  geminiApiKey: z.string().min(1),
+  ollamaBaseUrl: z.string().url().default("http://127.0.0.1:11434"),
+  ollamaModel: z.string().min(1).default("qwen3.5:9b"),
   whisperModel: z.enum(["tiny", "base", "small", "medium", "large"]).default("base"),
   maxParallelClips: z.coerce.number().int().min(1).max(10).default(3),
   silenceThresholdDb: z.coerce.number().default(-35),
@@ -27,7 +28,8 @@ export type Config = z.infer<typeof configSchema>;
 
 export function loadConfig(): Config {
   return configSchema.parse({
-    geminiApiKey: Bun.env.GEMINI_API_KEY,
+    ollamaBaseUrl: Bun.env.OLLAMA_BASE_URL,
+    ollamaModel: Bun.env.OLLAMA_MODEL,
     whisperModel: Bun.env.WHISPER_MODEL,
     maxParallelClips: Bun.env.MAX_PARALLEL_CLIPS,
     silenceThresholdDb: Bun.env.SILENCE_THRESHOLD_DB,

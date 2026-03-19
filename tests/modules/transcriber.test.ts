@@ -35,13 +35,16 @@ describe("Transcriber", () => {
   test("fromYouTube fetches transcript for known video", async () => {
     const transcriber = new Transcriber();
     const config = {
-      geminiApiKey: "",
+      ollamaBaseUrl: "http://127.0.0.1:11434",
+      ollamaModel: "qwen3.5:9b",
       whisperModel: "base" as const,
       maxParallelClips: 3,
       silenceThresholdDb: -35,
       silenceMinDuration: 0.8,
       outputWidth: 1080,
       outputHeight: 1920,
+      clipSpeed: 1.2,
+      maxClips: 0,
       preferYouTubeTranscripts: true,
       captionAnimate: true,
       paths: {

@@ -34,9 +34,9 @@ oxfmt --check src tests               # check only
 - **Language**: TypeScript (strict mode, ESNext, bundler module resolution)
 - **Path alias**: `@/*` → `./src/*`
 - **External CLI tools**: yt-dlp, ffmpeg/ffprobe, whisper-cli (C++ whisper.cpp)
-- **AI**: Google Gemini 2.5 Flash via `@google/genai` (structured JSON output with schema)
+- **AI**: Local Ollama model via the HTTP API (structured JSON output with schema)
 - **Video rendering**: Remotion (React-based, bundles via webpack, renders to VP9 WebM with alpha)
-- **Config**: Zod schema validating `Bun.env` vars (see `src/config.ts`). Requires `GEMINI_API_KEY`.
+- **Config**: Zod schema validating `Bun.env` vars (see `src/config.ts`). Defaults to a local Ollama server and model.
 
 ## Architecture
 
@@ -47,7 +47,7 @@ The pipeline has two phases defined in `src/pipeline/types.ts`:
 **Global stages** (sequential, once per video):
 1. `DOWNLOAD` — yt-dlp downloads video + metadata
 2. `TRANSCRIBE` — YouTube transcript API or Whisper for word-level timestamps
-3. `IDENTIFY_CLIPS` — Gemini analyzes transcript, returns `ClipCandidate[]` with timestamps and viral scores
+3. `IDENTIFY_CLIPS` — Ollama analyzes transcript, returns `ClipCandidate[]` with timestamps and viral scores
 
 **Clip stages** (parallel per clip, controlled by `Semaphore` in orchestrator):
 4. `EXTRACT_CLIPS` — FFmpeg extracts clip segment from source video
